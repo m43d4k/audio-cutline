@@ -121,6 +121,7 @@ public:
         wetMix.reset (sampleRate, 0.005, 0.0);
         activeBank.reset();
         transitionBank.reset();
+        designedCutoff = std::numeric_limits<double>::quiet_NaN();
         updateCoefficients();
     }
 
@@ -144,11 +145,20 @@ public:
     void updateCoefficients()
     {
         const auto cutoff = std::exp (frequencyLog.value());
+        const auto comparisonScale = std::max (
+            { 1.0, std::abs (cutoff), std::abs (designedCutoff) });
+
+        if (std::abs (cutoff - designedCutoff)
+            <= std::numeric_limits<double>::epsilon() * comparisonScale)
+            return;
+
         activeBank.coefficients = designButterworth<Sample> (type, activeOrder, cutoff, sampleRate);
 
         if (transitionLength > 0)
             transitionBank.coefficients = designButterworth<Sample> (
                 type, transitionOrder, cutoff, sampleRate);
+
+        designedCutoff = cutoff;
     }
 
     void processFrame (Sample& left, Sample& right) noexcept
@@ -211,6 +221,7 @@ private:
     int transitionLength {};
     LinearRamp frequencyLog;
     LinearRamp wetMix;
+    double designedCutoff { std::numeric_limits<double>::quiet_NaN() };
     FilterBank<Sample> activeBank;
     FilterBank<Sample> transitionBank;
 };
