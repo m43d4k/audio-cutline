@@ -110,6 +110,11 @@ public:
             return plot.getY() + plot.getHeight()
                  * static_cast<float> ((6.0 - std::clamp (decibels, -48.0, 6.0)) / 54.0);
         };
+        const auto responseDecibelsToY = [&plot] (double decibels)
+        {
+            return plot.getY() + plot.getHeight()
+                 * static_cast<float> ((6.0 - decibels) / 54.0);
+        };
 
         constexpr std::array gridFrequencies { 20.0, 50.0, 100.0, 200.0, 500.0,
                                                1000.0, 2000.0, 5000.0, 10000.0, 20000.0 };
@@ -169,15 +174,19 @@ public:
             const auto proportion = static_cast<double> (point) / (pointCount - 1);
             const auto frequency = 20.0 * std::pow (1000.0, proportion);
             const auto x = frequencyToX (frequency);
-            const auto y = decibelsToY (responseDb (frequency));
+            const auto y = responseDecibelsToY (responseDb (frequency));
             if (point == 0)
                 response.startNewSubPath (x, y);
             else
                 response.lineTo (x, y);
         }
 
-        graphics.setColour (curveColour);
-        graphics.strokePath (response, juce::PathStrokeType { 2.2f });
+        {
+            juce::Graphics::ScopedSaveState savedState (graphics);
+            graphics.reduceClipRegion (plot.toNearestIntEdges());
+            graphics.setColour (curveColour);
+            graphics.strokePath (response, juce::PathStrokeType { 2.2f });
+        }
 
         const auto drawCutoff = [&] (double frequency, juce::Colour colour)
         {

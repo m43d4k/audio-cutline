@@ -4,6 +4,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_graphics/juce_graphics.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -34,6 +35,38 @@ void setParameter (CutlineAudioProcessor& processor, const char* id, float plain
 float getParameter (const CutlineAudioProcessor& processor, const char* id)
 {
     return processor.getParameters().getRawParameterValue (id)->load();
+}
+
+juce::Image renderEditor (juce::AudioProcessorEditor& editor)
+{
+    juce::Image image (juce::Image::ARGB, editor.getWidth(), editor.getHeight(), true);
+    juce::Graphics graphics (image);
+    editor.paintEntireComponent (graphics, true);
+    return image;
+}
+
+int longestCurveRunNearGraphBottom (const juce::Image& image)
+{
+    constexpr auto firstY = 220;
+    constexpr auto lastY = 223;
+    const auto curve = juce::Colour { 0xffe5c07b };
+    auto longestRun = 0;
+
+    for (auto y = firstY; y <= lastY; ++y)
+    {
+        auto currentRun = 0;
+        for (auto x = 0; x < image.getWidth(); ++x)
+        {
+            const auto pixel = image.getPixelAt (x, y);
+            const auto isCurve = std::abs (static_cast<int> (pixel.getRed()) - curve.getRed()) <= 4
+                              && std::abs (static_cast<int> (pixel.getGreen()) - curve.getGreen()) <= 4
+                              && std::abs (static_cast<int> (pixel.getBlue()) - curve.getBlue()) <= 4;
+            currentRun = isCurve ? currentRun + 1 : 0;
+            longestRun = std::max (longestRun, currentRun);
+        }
+    }
+
+    return longestRun;
 }
 
 juce::MemoryBlock stateWithSchema (const juce::MemoryBlock& source, int schema)
@@ -90,9 +123,7 @@ void testProcessorContract()
     std::unique_ptr<juce::AudioProcessorEditor> editor (processor.createEditor());
     expect (editor != nullptr && editor->getWidth() == 720 && editor->getHeight() == 420,
             "editor must have a fixed initial size of 720 by 420");
-    juce::Image image (juce::Image::ARGB, 720, 420, true);
-    juce::Graphics graphics (image);
-    editor->paintEntireComponent (graphics, true);
+    auto image = renderEditor (*editor);
     expect (image.getPixelAt (10, 10).getAlpha() != 0, "editor must render an opaque UI");
 
     if (const auto* snapshotPath = std::getenv ("CUTLINE_UI_SNAPSHOT"))
@@ -102,6 +133,21 @@ void testProcessorContract()
         expect (output != nullptr && png.writeImageToStream (image, *output),
                 "optional UI snapshot must be writable");
     }
+
+    setParameter (processor, cutline::parameters::highPassEnabled, 1.0f);
+    setParameter (processor, cutline::parameters::highPassPoles, 7.0f);
+    setParameter (processor, cutline::parameters::highPassFrequency, 10000.0f);
+    image = renderEditor (*editor);
+    expect (longestCurveRunNearGraphBottom (image) < 12,
+            "high-pass response below -48 dB must not form a line along the graph bottom");
+
+    setParameter (processor, cutline::parameters::highPassEnabled, 0.0f);
+    setParameter (processor, cutline::parameters::lowPassEnabled, 1.0f);
+    setParameter (processor, cutline::parameters::lowPassPoles, 7.0f);
+    setParameter (processor, cutline::parameters::lowPassFrequency, 100.0f);
+    image = renderEditor (*editor);
+    expect (longestCurveRunNearGraphBottom (image) < 12,
+            "low-pass response below -48 dB must not form a line along the graph bottom");
 }
 
 void testStateRoundTripAndRejection()
