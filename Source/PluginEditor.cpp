@@ -72,13 +72,21 @@ public:
         setColour (juce::Slider::thumbColourId, text);
         setColour (juce::Slider::textBoxTextColourId, text);
         setColour (juce::Slider::textBoxBackgroundColourId, background);
-        setColour (juce::Slider::textBoxOutlineColourId, grid);
+        setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
         setColour (juce::ComboBox::backgroundColourId, background);
         setColour (juce::ComboBox::textColourId, text);
         setColour (juce::ComboBox::outlineColourId, grid);
         setColour (juce::PopupMenu::backgroundColourId, panel);
         setColour (juce::PopupMenu::textColourId, text);
         setColour (juce::ToggleButton::textColourId, text);
+    }
+
+    juce::Label* createSliderTextBox (juce::Slider& slider) override
+    {
+        auto* label = juce::LookAndFeel_V4::createSliderTextBox (slider);
+        label->setColour (juce::Label::outlineWhenEditingColourId,
+                          juce::Colours::transparentBlack);
+        return label;
     }
 };
 
@@ -219,17 +227,17 @@ CutlineAudioProcessorEditor::CutlineAudioProcessorEditor (CutlineAudioProcessor&
     setResizable (false, false);
     setSize (720, 420);
 
-    configureFrequencySlider (highPassFrequency);
-    configureFrequencySlider (lowPassFrequency);
-    configureGainSlider (outputGain);
-    configurePoleSelector (highPassPoles);
-    configurePoleSelector (lowPassPoles);
-
     for (auto* component : std::array<juce::Component*, 11> {
              responseGraph.get(), &highPassEnabled, &highPassPoles, &highPassFrequency,
              &lowPassEnabled, &lowPassPoles, &lowPassFrequency, &outputGain,
              &leftRightSwap, &filterBypass, &mono })
         addAndMakeVisible (*component);
+
+    configureFrequencySlider (highPassFrequency);
+    configureFrequencySlider (lowPassFrequency);
+    configureGainSlider (outputGain);
+    configurePoleSelector (highPassPoles);
+    configurePoleSelector (lowPassPoles);
 
     auto& state = pluginProcessor.getParameters();
     highPassEnabledAttachment = std::make_unique<ButtonAttachment> (
