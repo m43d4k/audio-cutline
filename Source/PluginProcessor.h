@@ -48,6 +48,9 @@ private:
         std::atomic<float>* lowPassPoles {};
         std::atomic<float>* lowPassFrequency {};
         std::atomic<float>* outputGain {};
+        std::atomic<float>* leftRightSwap {};
+        std::atomic<float>* filterBypass {};
+        std::atomic<float>* mono {};
     };
 
     cutline::dsp::Parameters readParameters() const noexcept;

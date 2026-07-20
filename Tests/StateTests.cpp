@@ -42,22 +42,44 @@ juce::ValueTree makeValidState()
     add (cutline::parameters::lowPassPoles, 7.0);
     add (cutline::parameters::lowPassFrequency, 20000.0);
     add (cutline::parameters::outputGain, -3.0);
+    add (cutline::parameters::leftRightSwap, 1.0);
+    add (cutline::parameters::filterBypass, 0.0);
+    add (cutline::parameters::mono, 1.0);
     return state;
 }
 
 void testValidation()
 {
     auto state = makeValidState();
-    expect (cutline::state::validateAndMigrate (state), "valid schema v1 state must be accepted");
+    expect (cutline::state::validateAndMigrate (state), "valid current-schema state must be accepted");
 
     auto legacy = makeValidState();
-    legacy.removeProperty (cutline::parameters::schemaProperty, nullptr);
-    expect (cutline::state::validateAndMigrate (legacy), "legacy state without schema must migrate");
-    expect (static_cast<int> (legacy[cutline::parameters::schemaProperty]) == 1,
-            "legacy migration must add schema version 1");
+    legacy.setProperty (cutline::parameters::schemaProperty, 1, nullptr);
+    legacy.removeChild (legacy.getChildWithProperty ("id", cutline::parameters::leftRightSwap), nullptr);
+    legacy.removeChild (legacy.getChildWithProperty ("id", cutline::parameters::filterBypass), nullptr);
+    legacy.removeChild (legacy.getChildWithProperty ("id", cutline::parameters::mono), nullptr);
+    expect (cutline::state::validateAndMigrate (legacy), "schema v1 state must migrate");
+    expect (static_cast<int> (legacy[cutline::parameters::schemaProperty])
+                == cutline::parameters::currentSchemaVersion,
+            "schema v1 migration must update the schema version");
+    expect (legacy.getChildWithProperty ("id", cutline::parameters::leftRightSwap)
+                  .getProperty ("value") == juce::var { 0.0 }
+            && legacy.getChildWithProperty ("id", cutline::parameters::filterBypass)
+                   .getProperty ("value") == juce::var { 0.0 }
+            && legacy.getChildWithProperty ("id", cutline::parameters::mono)
+                   .getProperty ("value") == juce::var { 0.0 },
+            "schema v1 migration must add disabled utility parameters");
+
+    auto unversioned = legacy.createCopy();
+    unversioned.removeProperty (cutline::parameters::schemaProperty, nullptr);
+    unversioned.removeChild (unversioned.getChildWithProperty ("id", cutline::parameters::leftRightSwap), nullptr);
+    unversioned.removeChild (unversioned.getChildWithProperty ("id", cutline::parameters::filterBypass), nullptr);
+    unversioned.removeChild (unversioned.getChildWithProperty ("id", cutline::parameters::mono), nullptr);
+    expect (cutline::state::validateAndMigrate (unversioned), "unversioned state must migrate");
 
     auto future = makeValidState();
-    future.setProperty (cutline::parameters::schemaProperty, 2, nullptr);
+    future.setProperty (cutline::parameters::schemaProperty,
+                        cutline::parameters::currentSchemaVersion + 1, nullptr);
     expect (! cutline::state::validateAndMigrate (future), "unknown future schema must be rejected");
 
     auto missing = makeValidState();

@@ -18,7 +18,7 @@ struct ParameterRange
     bool integral;
 };
 
-constexpr std::array ranges {
+constexpr std::array legacyRanges {
     ParameterRange { parameters::highPassEnabled, 0.0, 1.0, true },
     ParameterRange { parameters::highPassPoles, 0.0, 7.0, true },
     ParameterRange { parameters::highPassFrequency, 20.0, 20000.0, false },
@@ -28,12 +28,27 @@ constexpr std::array ranges {
     ParameterRange { parameters::outputGain, -12.0, 12.0, false }
 };
 
-bool validateParameters (const juce::ValueTree& candidate)
+constexpr std::array ranges {
+    ParameterRange { parameters::highPassEnabled, 0.0, 1.0, true },
+    ParameterRange { parameters::highPassPoles, 0.0, 7.0, true },
+    ParameterRange { parameters::highPassFrequency, 20.0, 20000.0, false },
+    ParameterRange { parameters::lowPassEnabled, 0.0, 1.0, true },
+    ParameterRange { parameters::lowPassPoles, 0.0, 7.0, true },
+    ParameterRange { parameters::lowPassFrequency, 20.0, 20000.0, false },
+    ParameterRange { parameters::outputGain, -12.0, 12.0, false },
+    ParameterRange { parameters::leftRightSwap, 0.0, 1.0, true },
+    ParameterRange { parameters::filterBypass, 0.0, 1.0, true },
+    ParameterRange { parameters::mono, 0.0, 1.0, true }
+};
+
+template <std::size_t Size>
+bool validateParameters (const juce::ValueTree& candidate,
+                         const std::array<ParameterRange, Size>& expectedRanges)
 {
-    if (candidate.getNumChildren() != static_cast<int> (ranges.size()))
+    if (candidate.getNumChildren() != static_cast<int> (expectedRanges.size()))
         return false;
 
-    for (const auto& range : ranges)
+    for (const auto& range : expectedRanges)
     {
         int matchingChildren = 0;
 
@@ -62,6 +77,14 @@ bool validateParameters (const juce::ValueTree& candidate)
 
     return true;
 }
+
+void addBooleanParameter (juce::ValueTree& state, const char* id)
+{
+    juce::ValueTree parameter ("PARAM");
+    parameter.setProperty ("id", id, nullptr);
+    parameter.setProperty ("value", 0.0, nullptr);
+    state.appendChild (parameter, nullptr);
+}
 }
 
 bool validateAndMigrate (juce::ValueTree& candidate)
@@ -81,14 +104,19 @@ bool validateAndMigrate (juce::ValueTree& candidate)
     if (schemaVersion < 0 || schemaVersion > parameters::currentSchemaVersion)
         return false;
 
-    if (! validateParameters (candidate))
-        return false;
+    if (schemaVersion <= 1)
+    {
+        if (! validateParameters (candidate, legacyRanges))
+            return false;
 
-    if (schemaVersion == 0)
+        addBooleanParameter (candidate, parameters::leftRightSwap);
+        addBooleanParameter (candidate, parameters::filterBypass);
+        addBooleanParameter (candidate, parameters::mono);
         candidate.setProperty (parameters::schemaProperty,
                                parameters::currentSchemaVersion, nullptr);
+    }
 
-    return true;
+    return validateParameters (candidate, ranges);
 }
 
 juce::ValueTree readValidatedState (const void* data, int sizeInBytes)

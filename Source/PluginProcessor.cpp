@@ -74,6 +74,9 @@ CutlineAudioProcessor::CutlineAudioProcessor()
     atomicParameters.lowPassPoles = parameters.getRawParameterValue (cutline::parameters::lowPassPoles);
     atomicParameters.lowPassFrequency = parameters.getRawParameterValue (cutline::parameters::lowPassFrequency);
     atomicParameters.outputGain = parameters.getRawParameterValue (cutline::parameters::outputGain);
+    atomicParameters.leftRightSwap = parameters.getRawParameterValue (cutline::parameters::leftRightSwap);
+    atomicParameters.filterBypass = parameters.getRawParameterValue (cutline::parameters::filterBypass);
+    atomicParameters.mono = parameters.getRawParameterValue (cutline::parameters::mono);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout CutlineAudioProcessor::createParameterLayout()
@@ -95,7 +98,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout CutlineAudioProcessor::creat
         parameterId (cutline::parameters::highPassEnabled), "HP On", false));
     result.push_back (std::make_unique<juce::AudioParameterChoice> (
         parameterId (cutline::parameters::highPassPoles), "HP Pole",
-        juce::StringArray { "1", "2", "3", "4", "5", "6", "7", "8" }, 0));
+        juce::StringArray { "6 dB/Oct", "12 dB/Oct", "18 dB/Oct", "24 dB/Oct",
+                            "30 dB/Oct", "36 dB/Oct", "42 dB/Oct", "48 dB/Oct" }, 0));
     result.push_back (std::make_unique<juce::AudioParameterFloat> (
         parameterId (cutline::parameters::highPassFrequency), "HP Freq",
         frequencyRange, 20.0f, frequencyAttributes));
@@ -103,7 +107,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout CutlineAudioProcessor::creat
         parameterId (cutline::parameters::lowPassEnabled), "LP On", false));
     result.push_back (std::make_unique<juce::AudioParameterChoice> (
         parameterId (cutline::parameters::lowPassPoles), "LP Pole",
-        juce::StringArray { "1", "2", "3", "4", "5", "6", "7", "8" }, 0));
+        juce::StringArray { "6 dB/Oct", "12 dB/Oct", "18 dB/Oct", "24 dB/Oct",
+                            "30 dB/Oct", "36 dB/Oct", "42 dB/Oct", "48 dB/Oct" }, 0));
     result.push_back (std::make_unique<juce::AudioParameterFloat> (
         parameterId (cutline::parameters::lowPassFrequency), "LP Freq",
         frequencyRange, 20000.0f, frequencyAttributes));
@@ -111,6 +116,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout CutlineAudioProcessor::creat
         parameterId (cutline::parameters::outputGain), "Output Gain",
         juce::NormalisableRange<float> { -12.0f, 12.0f, 0.01f }, 0.0f,
         gainAttributes));
+    result.push_back (std::make_unique<juce::AudioParameterBool> (
+        parameterId (cutline::parameters::leftRightSwap), "LR Swap", false));
+    result.push_back (std::make_unique<juce::AudioParameterBool> (
+        parameterId (cutline::parameters::filterBypass), "Filter Bypass", false));
+    result.push_back (std::make_unique<juce::AudioParameterBool> (
+        parameterId (cutline::parameters::mono), "Mono", false));
 
     return Parameter { result.begin(), result.end() };
 }
@@ -142,6 +153,9 @@ cutline::dsp::Parameters CutlineAudioProcessor::readParameters() const noexcept
     result.lowPassPoles = static_cast<int> (std::lround (atomicParameters.lowPassPoles->load())) + 1;
     result.lowPassFrequency = atomicParameters.lowPassFrequency->load();
     result.outputGainDb = atomicParameters.outputGain->load();
+    result.leftRightSwap = atomicParameters.leftRightSwap->load() >= 0.5f;
+    result.filterBypass = atomicParameters.filterBypass->load() >= 0.5f;
+    result.mono = atomicParameters.mono->load() >= 0.5f;
     return result;
 }
 

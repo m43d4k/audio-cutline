@@ -19,6 +19,9 @@ struct Parameters
     int lowPassPoles { 1 };
     float lowPassFrequency { 20000.0f };
     float outputGainDb {};
+    bool leftRightSwap {};
+    bool filterBypass {};
+    bool mono {};
 };
 
 namespace detail
@@ -229,6 +232,9 @@ public:
         highPass.prepare (FilterType::highPass, sampleRate, parameters.highPassFrequency);
         lowPass.prepare (FilterType::lowPass, sampleRate, parameters.lowPassFrequency);
         outputGain.reset (sampleRate, 0.010, decibelsToGain (parameters.outputGainDb));
+        filterMix.reset (sampleRate, 0.005, 1.0);
+        swapMix.reset (sampleRate, 0.005, 0.0);
+        monoMix.reset (sampleRate, 0.005, 0.0);
     }
 
     void setTargets (const Parameters& newParameters)
@@ -245,6 +251,9 @@ public:
                             parameters.lowPassPoles,
                             parameters.lowPassFrequency);
         outputGain.setTarget (decibelsToGain (parameters.outputGainDb));
+        filterMix.setTarget (parameters.filterBypass ? 0.0 : 1.0);
+        swapMix.setTarget (parameters.leftRightSwap ? 1.0 : 0.0);
+        monoMix.setTarget (parameters.mono ? 1.0 : 0.0);
     }
 
     void process (Sample* const* channels, int channelCount, int sampleCount) noexcept
@@ -264,11 +273,27 @@ public:
             {
                 auto left = channels[0][sample];
                 auto right = channels[1][sample];
+                const auto dryLeft = left;
+                const auto dryRight = right;
                 highPass.processFrame (left, right);
                 lowPass.processFrame (left, right);
+                const auto filters = static_cast<Sample> (filterMix.next());
+                left = dryLeft + (left - dryLeft) * filters;
+                right = dryRight + (right - dryRight) * filters;
+
                 const auto gain = static_cast<Sample> (outputGain.next());
-                channels[0][sample] = left * gain;
-                channels[1][sample] = right * gain;
+                left *= gain;
+                right *= gain;
+
+                const auto swap = static_cast<Sample> (swapMix.next());
+                const auto unswappedLeft = left;
+                left += (right - left) * swap;
+                right += (unswappedLeft - right) * swap;
+
+                const auto mono = static_cast<Sample> (monoMix.next());
+                const auto monoSignal = static_cast<Sample> (0.5) * (left + right);
+                channels[0][sample] = left + (monoSignal - left) * mono;
+                channels[1][sample] = right + (monoSignal - right) * mono;
             }
         }
     }
@@ -285,5 +310,8 @@ private:
     detail::CutFilter<Sample> highPass;
     detail::CutFilter<Sample> lowPass;
     detail::LinearRamp outputGain;
+    detail::LinearRamp filterMix;
+    detail::LinearRamp swapMix;
+    detail::LinearRamp monoMix;
 };
 }

@@ -147,6 +147,7 @@ public:
         };
         const auto hpEnabled = value (cutline::parameters::highPassEnabled) >= 0.5;
         const auto lpEnabled = value (cutline::parameters::lowPassEnabled) >= 0.5;
+        const auto filtersBypassed = value (cutline::parameters::filterBypass) >= 0.5;
         const auto hpOrder = static_cast<int> (std::lround (value (cutline::parameters::highPassPoles))) + 1;
         const auto lpOrder = static_cast<int> (std::lround (value (cutline::parameters::lowPassPoles))) + 1;
         const auto hpFrequency = value (cutline::parameters::highPassFrequency);
@@ -160,9 +161,9 @@ public:
         const auto responseDb = [&] (double frequency)
         {
             auto magnitude = 1.0;
-            if (hpEnabled)
+            if (hpEnabled && ! filtersBypassed)
                 magnitude *= cutline::dsp::magnitudeAt (hp, frequency, sampleRate);
-            if (lpEnabled)
+            if (lpEnabled && ! filtersBypassed)
                 magnitude *= cutline::dsp::magnitudeAt (lp, frequency, sampleRate);
             return 20.0 * std::log10 (std::max (magnitude, 1.0e-12));
         };
@@ -198,9 +199,9 @@ public:
             graphics.drawEllipse (juce::Rectangle<float> { 8.0f, 8.0f }.withCentre (centre), 1.0f);
         };
 
-        if (hpEnabled)
+        if (hpEnabled && ! filtersBypassed)
             drawCutoff (hpFrequency, highPassColour);
-        if (lpEnabled)
+        if (lpEnabled && ! filtersBypassed)
             drawCutoff (lpFrequency, lowPassColour);
     }
 
@@ -224,9 +225,10 @@ CutlineAudioProcessorEditor::CutlineAudioProcessorEditor (CutlineAudioProcessor&
     configurePoleSelector (highPassPoles);
     configurePoleSelector (lowPassPoles);
 
-    for (auto* component : std::array<juce::Component*, 8> {
+    for (auto* component : std::array<juce::Component*, 11> {
              responseGraph.get(), &highPassEnabled, &highPassPoles, &highPassFrequency,
-             &lowPassEnabled, &lowPassPoles, &lowPassFrequency, &outputGain })
+             &lowPassEnabled, &lowPassPoles, &lowPassFrequency, &outputGain,
+             &leftRightSwap, &filterBypass, &mono })
         addAndMakeVisible (*component);
 
     auto& state = pluginProcessor.getParameters();
@@ -244,6 +246,12 @@ CutlineAudioProcessorEditor::CutlineAudioProcessorEditor (CutlineAudioProcessor&
         state, cutline::parameters::lowPassFrequency, lowPassFrequency);
     outputGainAttachment = std::make_unique<SliderAttachment> (
         state, cutline::parameters::outputGain, outputGain);
+    leftRightSwapAttachment = std::make_unique<ButtonAttachment> (
+        state, cutline::parameters::leftRightSwap, leftRightSwap);
+    filterBypassAttachment = std::make_unique<ButtonAttachment> (
+        state, cutline::parameters::filterBypass, filterBypass);
+    monoAttachment = std::make_unique<ButtonAttachment> (
+        state, cutline::parameters::mono, mono);
 
     highPassFrequency.textFromValueFunction = formatFrequency;
     highPassFrequency.valueFromTextFunction = parseFrequency;
@@ -289,9 +297,9 @@ void CutlineAudioProcessorEditor::configureGainSlider (juce::Slider& slider)
 
 void CutlineAudioProcessorEditor::configurePoleSelector (juce::ComboBox& selector)
 {
-    selector.setTextWhenNothingSelected ("Pole");
+    selector.setTextWhenNothingSelected ("dB/Oct");
     for (int pole = 1; pole <= 8; ++pole)
-        selector.addItem (juce::String (pole) + " pole", pole);
+        selector.addItem (juce::String (pole * 6) + " dB/Oct", pole);
 }
 
 void CutlineAudioProcessorEditor::paint (juce::Graphics& graphics)
@@ -326,4 +334,8 @@ void CutlineAudioProcessorEditor::resized()
     lowPassFrequency.setBounds (296, 307, 128, 105);
 
     outputGain.setBounds (531, 285, 128, 127);
+
+    leftRightSwap.setBounds (392, 7, 90, 24);
+    filterBypass.setBounds (489, 7, 128, 24);
+    mono.setBounds (625, 7, 76, 24);
 }

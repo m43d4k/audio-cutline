@@ -144,6 +144,61 @@ void testEngineSafetyAndGain()
     }
 }
 
+template <typename Sample>
+void testUtilityRoutingAndFilterBypass()
+{
+    constexpr auto sampleRate = 1000.0;
+    constexpr auto sampleCount = 64;
+    cutline::dsp::CutlineEngine<Sample> engine;
+    engine.prepare (sampleRate, sampleCount);
+
+    auto parameters = cutline::dsp::Parameters {};
+    parameters.highPassEnabled = true;
+    parameters.highPassFrequency = 200.0f;
+    engine.setTargets (parameters);
+
+    std::array<Sample, sampleCount> left {};
+    std::array<Sample, sampleCount> right {};
+    Sample* channels[] { left.data(), right.data() };
+
+    for (int pass = 0; pass < 4; ++pass)
+    {
+        left.fill (static_cast<Sample> (1.0));
+        right.fill (static_cast<Sample> (1.0));
+        engine.process (channels, 2, sampleCount);
+    }
+    expectNear (static_cast<double> (left.back()), 0.0, 1.0e-4,
+                "enabled high-pass must reject settled DC");
+
+    parameters.filterBypass = true;
+    engine.setTargets (parameters);
+    left.fill (static_cast<Sample> (1.0));
+    right.fill (static_cast<Sample> (1.0));
+    engine.process (channels, 2, sampleCount);
+    expectNear (static_cast<double> (left.back()), 1.0, 1.0e-4,
+                "filter bypass must converge to the unfiltered signal");
+
+    parameters.leftRightSwap = true;
+    engine.setTargets (parameters);
+    left.fill (static_cast<Sample> (0.25));
+    right.fill (static_cast<Sample> (-0.75));
+    engine.process (channels, 2, sampleCount);
+    expectNear (static_cast<double> (left.back()), -0.75, 1.0e-4,
+                "LR swap must route right input to left output");
+    expectNear (static_cast<double> (right.back()), 0.25, 1.0e-4,
+                "LR swap must route left input to right output");
+
+    parameters.mono = true;
+    engine.setTargets (parameters);
+    left.fill (static_cast<Sample> (0.25));
+    right.fill (static_cast<Sample> (-0.75));
+    engine.process (channels, 2, sampleCount);
+    expectNear (static_cast<double> (left.back()), -0.25, 1.0e-4,
+                "mono must output the arithmetic mean on the left");
+    expectNear (static_cast<double> (right.back()), -0.25, 1.0e-4,
+                "mono must output the arithmetic mean on the right");
+}
+
 void testInvalidSampleRateIsDry()
 {
     cutline::dsp::CutlineEngine<float> engine;
@@ -171,6 +226,8 @@ int main()
     testAsymptoticSlope();
     testEngineSafetyAndGain<float>();
     testEngineSafetyAndGain<double>();
+    testUtilityRoutingAndFilterBypass<float>();
+    testUtilityRoutingAndFilterBypass<double>();
     testInvalidSampleRateIsDry();
 
     if (failures != 0)

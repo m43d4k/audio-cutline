@@ -34,6 +34,9 @@ private:
     juce::ComboBox lowPassPoles;
     juce::Slider lowPassFrequency;
     juce::Slider outputGain;
+    juce::ToggleButton leftRightSwap { "LR SWAP" };
+    juce::ToggleButton filterBypass { "FILTER BYPASS" };
+    juce::ToggleButton mono { "MONO" };
 
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
     using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
@@ -45,6 +48,9 @@ private:
     std::unique_ptr<ComboBoxAttachment> lowPassPolesAttachment;
     std::unique_ptr<SliderAttachment> lowPassFrequencyAttachment;
     std::unique_ptr<SliderAttachment> outputGainAttachment;
+    std::unique_ptr<ButtonAttachment> leftRightSwapAttachment;
+    std::unique_ptr<ButtonAttachment> filterBypassAttachment;
+    std::unique_ptr<ButtonAttachment> monoAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CutlineAudioProcessorEditor)
 };

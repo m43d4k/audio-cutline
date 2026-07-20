@@ -1,19 +1,20 @@
 # Cutline
 
 Apple Silicon Mac上のAbleton Liveを主な対象とする、ステレオVST3フィルター
-プラグインである。1〜8 poleのMinimum Phase Butterworthハイパス／ローパスと、
--12〜+12 dBの出力ゲインを提供する。
+プラグインである。1〜8 poleのMinimum Phase Butterworthハイパス／ローパス、
+-12〜+12 dBの出力ゲイン、ステレオユーティリティを提供する。
 
 ## 機能
 
 * HP／LPごとのOn/Off、20 Hz〜20 kHz、1〜8 pole
+* LR Swap、Filter Bypass、ステレオ入力のMono化
 * 周波数と出力ゲインの平滑化
 * Dry/WetとPole変更のクロスフェード
 * float／double処理、0 samplesを含む可変ブロック、0 samplesレイテンシー
-* APVTSによる全7パラメータのオートメーションと検証付き状態復元
+* APVTSによる全10パラメータのオートメーションと検証付き状態復元
 * 20 Hz〜20 kHzの合成応答を表示する固定サイズのダークUI
 
-スペクトラム、Linear Phase、オーバーサンプリング、モノ／M/S、AU、Windowsには
+スペクトラム、Linear Phase、オーバーサンプリング、モノ入出力バス／M/S、AU、Windowsには
 対応しない。
 
 ## 必要環境

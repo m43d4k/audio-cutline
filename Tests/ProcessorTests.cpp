@@ -85,9 +85,19 @@ void testProcessorContract()
     CutlineAudioProcessor processor;
     for (const auto id : cutline::parameters::ids)
         expect (processor.getParameters().getParameter (id.data()) != nullptr,
-                "all seven automatable parameters must be exposed");
+                "all ten automatable parameters must be exposed");
+    expect (processor.AudioProcessor::getParameters().size() == 10,
+            "the processor must expose exactly ten parameters");
+    expect (getParameter (processor, cutline::parameters::leftRightSwap) == 0.0f
+            && getParameter (processor, cutline::parameters::filterBypass) == 0.0f
+            && getParameter (processor, cutline::parameters::mono) == 0.0f,
+            "utility parameters must default to off");
     const auto* frequencyParameter = processor.getParameters().getParameter (
         cutline::parameters::highPassFrequency);
+    const auto* highPassPolesParameter = processor.getParameters().getParameter (
+        cutline::parameters::highPassPoles);
+    const auto* lowPassPolesParameter = processor.getParameters().getParameter (
+        cutline::parameters::lowPassPoles);
     const auto* gainParameter = processor.getParameters().getParameter (
         cutline::parameters::outputGain);
     expect (frequencyParameter->getText (frequencyParameter->convertTo0to1 (1500.0f), 16).contains ("kHz"),
@@ -100,6 +110,13 @@ void testProcessorContract()
     expect (std::abs (gainParameter->convertFrom0to1 (
                          gainParameter->getValueForText ("-3 dB")) + 3.0f) < 0.01f,
             "gain parameters must parse unit-bearing input");
+    expect (highPassPolesParameter->getText (0.0f, 16) == "6 dB/Oct",
+            "one-pole HP values must display as 6 dB/Oct");
+    expect (highPassPolesParameter->getText (1.0f, 16) == "48 dB/Oct",
+            "eight-pole HP values must display as 48 dB/Oct");
+    expect (lowPassPolesParameter->getText (0.0f, 16) == "6 dB/Oct"
+            && lowPassPolesParameter->getText (1.0f, 16) == "48 dB/Oct",
+            "LP values must use the same dB/Oct display");
     expect (processor.supportsDoublePrecisionProcessing(), "double precision must be supported");
     expect (processor.getLatencySamples() == 0, "reported latency must be zero");
 
@@ -123,6 +140,27 @@ void testProcessorContract()
     std::unique_ptr<juce::AudioProcessorEditor> editor (processor.createEditor());
     expect (editor != nullptr && editor->getWidth() == 720 && editor->getHeight() == 420,
             "editor must have a fixed initial size of 720 by 420");
+    auto poleSelectors = 0;
+    auto utilityButtons = 0;
+    for (auto* component : editor->getChildren())
+    {
+        if (const auto* selector = dynamic_cast<juce::ComboBox*> (component))
+        {
+            ++poleSelectors;
+            expect (selector->getItemText (0) == "6 dB/Oct"
+                    && selector->getItemText (7) == "48 dB/Oct",
+                    "pole selectors must display their slopes in dB/Oct");
+        }
+        if (const auto* button = dynamic_cast<juce::ToggleButton*> (component))
+        {
+            if (button->getButtonText() == "LR SWAP"
+                || button->getButtonText() == "FILTER BYPASS"
+                || button->getButtonText() == "MONO")
+                ++utilityButtons;
+        }
+    }
+    expect (poleSelectors == 2, "editor must expose HP and LP pole selectors");
+    expect (utilityButtons == 3, "editor must expose all three utility toggles");
     auto image = renderEditor (*editor);
     expect (image.getPixelAt (10, 10).getAlpha() != 0, "editor must render an opaque UI");
 
@@ -157,6 +195,9 @@ void testStateRoundTripAndRejection()
     setParameter (processor, cutline::parameters::highPassPoles, 6.0f);
     setParameter (processor, cutline::parameters::highPassFrequency, 1234.0f);
     setParameter (processor, cutline::parameters::outputGain, -4.5f);
+    setParameter (processor, cutline::parameters::leftRightSwap, 1.0f);
+    setParameter (processor, cutline::parameters::filterBypass, 1.0f);
+    setParameter (processor, cutline::parameters::mono, 1.0f);
 
     juce::MemoryBlock saved;
     processor.getStateInformation (saved);
@@ -166,6 +207,9 @@ void testStateRoundTripAndRejection()
     setParameter (processor, cutline::parameters::highPassPoles, 0.0f);
     setParameter (processor, cutline::parameters::highPassFrequency, 20.0f);
     setParameter (processor, cutline::parameters::outputGain, 0.0f);
+    setParameter (processor, cutline::parameters::leftRightSwap, 0.0f);
+    setParameter (processor, cutline::parameters::filterBypass, 0.0f);
+    setParameter (processor, cutline::parameters::mono, 0.0f);
     processor.setStateInformation (saved.getData(), static_cast<int> (saved.getSize()));
 
     expect (getParameter (processor, cutline::parameters::highPassEnabled) == 1.0f,
@@ -176,6 +220,10 @@ void testStateRoundTripAndRejection()
             "frequency state must round-trip");
     expect (std::abs (getParameter (processor, cutline::parameters::outputGain) + 4.5f) < 0.01f,
             "gain state must round-trip");
+    expect (getParameter (processor, cutline::parameters::leftRightSwap) == 1.0f
+            && getParameter (processor, cutline::parameters::filterBypass) == 1.0f
+            && getParameter (processor, cutline::parameters::mono) == 1.0f,
+            "utility state must round-trip");
 
     const auto rejectedBaseline = getParameter (processor, cutline::parameters::outputGain);
     const auto future = stateWithSchema (saved, cutline::parameters::currentSchemaVersion + 1);
