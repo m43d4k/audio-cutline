@@ -1,0 +1,20 @@
+Cutline third-party notices
+===========================
+
+JUCE
+----
+
+Cutline is built with JUCE 8.0.14 at commit
+2cdfca8feb300fb424002ba2c2751569e5bacb64.
+
+JUCE is Copyright (c) Raw Material Software Limited and is licensed separately
+under the JUCE licence selected by the person building Cutline. JUCE is not
+covered by Cutline's MIT License. See https://juce.com/legal/juce-8-licence/.
+
+pluginval
+---------
+
+Continuous integration may build and run pluginval 1.0.4 at commit
+ed19c2c16b57a6d94db391bea3ef4a80b769d5bf. pluginval is licensed under
+GPLv3. It is a validation tool and is not linked into or distributed with
+Cutline.

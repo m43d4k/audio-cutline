@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-validate:
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Select and report toolchain
+        shell: bash
+        run: |
+          XCODE_PATH=""
+          for candidate in /Applications/Xcode_26.3.app/Contents/Developer /Applications/Xcode.app/Contents/Developer; do
+            if test -x "$candidate/usr/bin/xcodebuild" && "$candidate/usr/bin/xcodebuild" -version | grep -q '^Xcode 26\.3$'; then
+              XCODE_PATH="$candidate"
+              break
+            fi
+          done
+          test -n "$XCODE_PATH"
+          sudo xcode-select -s "$XCODE_PATH"
+          sw_vers
+          xcodebuild -version
+          xcodebuild -version | grep -q '^Xcode 26\.3$'
+          cmake --version
+          uname -m
+
+      - name: Configure Cutline
+        run: >-
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_OSX_ARCHITECTURES=arm64
+
+      - name: Build Cutline and tests
+        run: cmake --build build --target Cutline_VST3 CutlineDspTests CutlineStateTests CutlineProcessorTests CutlineDspBenchmark -j 6
+
+      - name: Run tests and benchmark
+        run: |
+          ctest --test-dir build --output-on-failure
+          ./build/CutlineDspBenchmark
+          lipo -archs build/Cutline_artefacts/Release/VST3/Cutline.vst3/Contents/MacOS/Cutline | grep -Fx arm64
+
+      - name: Fetch fixed pluginval source
+        shell: bash
+        run: |
+          PLUGINVAL_SOURCE="$RUNNER_TEMP/pluginval-source"
+          git init "$PLUGINVAL_SOURCE"
+          git -C "$PLUGINVAL_SOURCE" remote add origin https://github.com/Tracktion/pluginval.git
+          git -C "$PLUGINVAL_SOURCE" fetch --depth 1 origin ed19c2c16b57a6d94db391bea3ef4a80b769d5bf
+          git -C "$PLUGINVAL_SOURCE" checkout --detach FETCH_HEAD
+          git -C "$PLUGINVAL_SOURCE" submodule update --init --depth 1
+
+      - name: Build pluginval
+        shell: bash
+        run: |
+          cmake -S "$RUNNER_TEMP/pluginval-source" -B "$RUNNER_TEMP/pluginval-build" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64
+          cmake --build "$RUNNER_TEMP/pluginval-build" --target pluginval -j 6
+
+      - name: Validate VST3
+        shell: bash
+        run: >-
+          "$RUNNER_TEMP/pluginval-build/pluginval_artefacts/Release/pluginval.app/Contents/MacOS/pluginval"
+          --strictness-level 10
+          --sample-rates 44100,48000,88200,96000,176400,192000
+          --validate
+          "$GITHUB_WORKSPACE/build/Cutline_artefacts/Release/VST3/Cutline.vst3"

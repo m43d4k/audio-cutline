@@ -1,0 +1,32 @@
+# CMake / Ninja build trees
+/build*/
+/cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+CTestTestfile.cmake
+cmake_install.cmake
+compile_commands.json
+Testing/
+_deps/
+*.ninja
+.ninja_deps
+.ninja_log
+
+# Generated plugin and binary artefacts
+*.vst3/
+*.component/
+*.a
+*.dylib
+*.so
+
+# Xcode user and derived data
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Local tool environments
+/.venv/
+/.mise/
+
+# macOS metadata
+.DS_Store
